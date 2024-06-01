@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Summary Extractor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Quick Summary Extractor and Q&A System</h1>
+
+    <div id="input-section">
+        <textarea id="input-text" placeholder="Enter text to summarize..."></textarea>
+        <button id="summarize-btn">Summarize Text</button>
+        <input type="file" id="file-input">
+        <button id="summarize-pdf-btn">Summarize PDF</button>
+    </div>
+
+    <div id="output-section">
+        <h2>Summary</h2>
+        <p id="summary-text"></p>
+    </div>
+
+    <div id="bot-ques">
+        <textarea id="input-ques" placeholder="Enter Your Question Here..."></textarea>
+        <button id="ques-btn">Ask</button>
+    </div>
+
+    <div id="bot-ans">
+        <p id="ans"></p>
+    </div>
+
+    <script>
+        document.getElementById('summarize-btn').addEventListener('click', function() {
+            var inputText = document.getElementById('input-text').value;
+            alert("Summarising...");
+
+            // Make AJAX request to Flask backend to get summary
+            fetch('/summarize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ "text": inputText })
+            }).then(response => response.json()).then(data => {
+                console.log(data);
+                document.getElementById('summary-text').textContent = data.summary;
+                document.getElementById('output-section').style.display = 'block';
+            })
+            .catch(error => console.error('Error:', error));
+        });
+<!---->
+document.getElementById('summarize-pdf-btn').addEventListener('click', function() {
+    var fileInput = document.getElementById('file-input').files[0];
+
+    // Check if a file is selected
+    if (fileInput) {
+        alert("Processing " + fileInput.name);
+
+        // Create a new FileReader object
+        var reader = new FileReader();
+
+        // Define the onload event handler
+        reader.onload = function(e) {
+            var arrayBuffer = e.target.result;
+
+            // Use pdf.js to parse the PDF file
+            var loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
+            loadingTask.promise.then(function(pdf) {
+                var totalPageCount = pdf.numPages;
+                var textPromises = [];
+
+                // Extract text from each page
+                for (var currentPage = 1; currentPage <= totalPageCount; currentPage++) {
+                    textPromises.push(pdf.getPage(currentPage).then(function(page) {
+                        return page.getTextContent().then(function(textContent) {
+                            return textContent.items.map(function(item) {
+                                return item.str;
+                            }).join(' ');
+                        });
+                    }));
+                }
+
+                // Combine texts from all pages
+                Promise.all(textPromises).then(function(texts) {
+                alert("combining texts");
+                    var fullText = texts.join('\n\n');
+                    document.getElementById('summary-text').textContent = fullText;
+                    document.getElementById('output-section').style.display = 'block';
+                    alert(fullText);
+                });
+            }, function(reason) {
+                console.error(reason);
+            });
+        };
+
+        // Read the file as ArrayBuffer
+        reader.readAsArrayBuffer(fileInput);
+    } else {
+        alert("No file selected!");
+    }
+});
+
+
+<!---->
+        document.getElementById('ques-btn').addEventListener('click', function() {
+            var ques = document.getElementById('input-ques').value;
+            alert("Your Question has been received ");
+            // Make AJAX request to Flask backend to get summary
+            fetch('/answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ "text": ques })
+            }).then(response => response.json()).then(data => {
+                document.getElementById('ans').textContent = data.answer;
+                document.getElementById('bot-ans').style.display = 'block';
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
